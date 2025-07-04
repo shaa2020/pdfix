@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, CreditCard, Smartphone } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
@@ -15,8 +16,14 @@ interface RemoveAdsModalProps {
 
 const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('BDT');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [transactionId, setTransactionId] = useState('');
+
+  const prices = {
+    BDT: { amount: '৳350', symbol: '৳' },
+    USD: { amount: '$2.99', symbol: '$' }
+  };
 
   const paymentMethods = [
     {
@@ -24,23 +31,30 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
       name: 'bKash',
       number: '+880-1234-567890',
       icon: <Smartphone className="h-6 w-6" />,
-      color: 'bg-pink-500'
+      color: 'bg-pink-500',
+      currencies: ['BDT']
     },
     {
       id: 'nagad',
       name: 'Nagad',
       number: '+880-0987-654321',
       icon: <Smartphone className="h-6 w-6" />,
-      color: 'bg-orange-500'
+      color: 'bg-orange-500',
+      currencies: ['BDT']
     },
     {
       id: 'paypal',
       name: 'PayPal',
       number: 'your-paypal-id@example.com',
       icon: <CreditCard className="h-6 w-6" />,
-      color: 'bg-blue-500'
+      color: 'bg-blue-500',
+      currencies: ['USD']
     }
   ];
+
+  const availableMethods = paymentMethods.filter(method => 
+    method.currencies.includes(selectedCurrency)
+  );
 
   const handleScreenshotUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,6 +73,8 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
     // Store payment verification request in localStorage
     const paymentRequest = {
       method: selectedMethod,
+      currency: selectedCurrency,
+      amount: prices[selectedCurrency as keyof typeof prices].amount,
       transactionId,
       timestamp: Date.now(),
       status: 'pending'
@@ -69,20 +85,40 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
     onClose();
   };
 
+  const handleCurrencyChange = (currency: string) => {
+    setSelectedCurrency(currency);
+    setSelectedMethod(''); // Reset selected method when currency changes
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-center">Remove Ads - $2.99</DialogTitle>
+          <DialogTitle className="text-center">
+            Remove Ads - {prices[selectedCurrency as keyof typeof prices].amount}
+          </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
+          <div>
+            <Label htmlFor="currency">Select Currency</Label>
+            <Select value={selectedCurrency} onValueChange={handleCurrencyChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BDT">Bangladesh Taka (৳)</SelectItem>
+                <SelectItem value="USD">US Dollar ($)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <p className="text-sm text-muted-foreground text-center">
             Choose a payment method and upload payment screenshot for verification
           </p>
           
           <div className="space-y-3">
-            {paymentMethods.map((method) => (
+            {availableMethods.map((method) => (
               <Card 
                 key={method.id}
                 className={`cursor-pointer transition-all ${
@@ -95,9 +131,12 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
                     <div className={`p-2 rounded-full text-white ${method.color}`}>
                       {method.icon}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-medium">{method.name}</h4>
                       <p className="text-sm text-muted-foreground">{method.number}</p>
+                      <p className="text-sm font-medium text-primary">
+                        Send: {prices[selectedCurrency as keyof typeof prices].amount}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -120,7 +159,7 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
               <div>
                 <Label htmlFor="screenshot">Upload Payment Screenshot</Label>
                 <div className="mt-2">
-                  <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50">
+                  <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                     <div className="text-center">
                       <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                       <p className="text-sm text-muted-foreground">

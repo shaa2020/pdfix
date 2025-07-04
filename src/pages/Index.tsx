@@ -12,6 +12,7 @@ import RemoveAdsModal from "@/components/ads/RemoveAdsModal";
 import InterstitialAd from "@/components/ads/InterstitialAd";
 import { useAdFree } from "@/hooks/useAdFree";
 import { useTheme } from "@/components/theme/ThemeProvider";
+import { useAdTimer } from "@/hooks/useAdTimer";
 
 interface ImageFile {
   id: string;
@@ -33,6 +34,10 @@ const Index = () => {
   
   const { isAdFree, loading } = useAdFree();
   const { theme, setTheme } = useTheme();
+  const { adKey, timeUntilRefresh, refreshAd } = useAdTimer({ 
+    refreshInterval: 30, 
+    isAdFree 
+  });
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -193,9 +198,13 @@ const Index = () => {
         {/* Top Banner Ad */}
         {!isAdFree && (
           <AdSenseAd 
+            key={`top-${adKey}`}
             adSlot="1234567890"
             className="w-full"
             style={{ minHeight: '90px' }}
+            showTimer={true}
+            timeUntilRefresh={timeUntilRefresh}
+            onRefresh={refreshAd}
           />
         )}
 
@@ -345,9 +354,13 @@ const Index = () => {
         {/* Middle Banner Ad */}
         {!isAdFree && images.length > 0 && (
           <AdSenseAd 
+            key={`middle-${adKey}`}
             adSlot="0987654321"
             className="w-full"
             style={{ minHeight: '250px' }}
+            showTimer={true}
+            timeUntilRefresh={timeUntilRefresh}
+            onRefresh={refreshAd}
           />
         )}
       </div>
@@ -356,9 +369,13 @@ const Index = () => {
       {!isAdFree && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t">
           <AdSenseAd 
+            key={`bottom-${adKey}`}
             adSlot="1122334455"
             className="w-full"
             style={{ minHeight: '60px' }}
+            showTimer={true}
+            timeUntilRefresh={timeUntilRefresh}
+            onRefresh={refreshAd}
           />
         </div>
       )}
