@@ -1,6 +1,5 @@
-
 import { useState, useRef } from "react";
-import { Camera, Upload, Download, Trash2, RotateCcw, Settings } from "lucide-react";
+import { Camera, Upload, Download, Trash2, RotateCcw, Settings, Moon, Sun, Star, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 import jsPDF from 'jspdf';
+import AdSenseAd from "@/components/ads/AdSenseAd";
+import RemoveAdsModal from "@/components/ads/RemoveAdsModal";
+import InterstitialAd from "@/components/ads/InterstitialAd";
+import { useAdFree } from "@/hooks/useAdFree";
+import { useTheme } from "@/components/theme/ThemeProvider";
 
 interface ImageFile {
   id: string;
@@ -22,8 +26,13 @@ const Index = () => {
   const [pageSize, setPageSize] = useState("a4");
   const [imageScaling, setImageScaling] = useState("fit");
   const [isConverting, setIsConverting] = useState(false);
+  const [showRemoveAdsModal, setShowRemoveAdsModal] = useState(false);
+  const [showInterstitialAd, setShowInterstitialAd] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  
+  const { isAdFree, loading } = useAdFree();
+  const { theme, setTheme } = useTheme();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -69,6 +78,16 @@ const Index = () => {
       return;
     }
 
+    // Show interstitial ad before conversion (if not ad-free)
+    if (!isAdFree) {
+      setShowInterstitialAd(true);
+      return;
+    }
+
+    await performPDFConversion();
+  };
+
+  const performPDFConversion = async () => {
     setIsConverting(true);
     try {
       const pdf = new jsPDF({
@@ -95,7 +114,6 @@ const Index = () => {
             
             let { width, height } = img;
             
-            // Calculate dimensions based on scaling option
             if (imageScaling === 'fit') {
               const ratio = Math.min(pageWidth / width, pageHeight / height);
               width *= ratio;
@@ -110,8 +128,6 @@ const Index = () => {
             ctx?.drawImage(img, 0, 0, width, height);
             
             const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            
-            // Center the image on the page
             const x = (pageWidth - width) / 2;
             const y = (pageHeight - height) / 2;
             
@@ -128,6 +144,7 @@ const Index = () => {
       toast.error("Failed to generate PDF");
     } finally {
       setIsConverting(false);
+      setShowInterstitialAd(false);
     }
   };
 
@@ -137,9 +154,51 @@ const Index = () => {
     toast.success("All images cleared");
   };
 
+  if (loading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>;
+  }
+
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+          <h1 className="text-xl font-bold">PDF Converter</h1>
+          <div className="flex items-center gap-2">
+            {!isAdFree && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRemoveAdsModal(true)}
+                className="text-xs"
+              >
+                <Star className="h-3 w-3 mr-1" />
+                Remove Ads
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto p-4 space-y-6">
+        {/* Top Banner Ad */}
+        {!isAdFree && (
+          <AdSenseAd 
+            adSlot="1234567890"
+            className="w-full"
+            style={{ minHeight: '90px' }}
+          />
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">
@@ -147,7 +206,6 @@ const Index = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* File Input Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Button
                 onClick={() => fileInputRef.current?.click()}
@@ -184,7 +242,6 @@ const Index = () => {
               className="hidden"
             />
 
-            {/* PDF Settings */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="pdfName">PDF Name</Label>
@@ -223,7 +280,6 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Image Preview */}
             {images.length > 0 && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -265,7 +321,6 @@ const Index = () => {
               </div>
             )}
 
-            {/* Convert Button */}
             <Button
               onClick={convertToPDF}
               disabled={images.length === 0 || isConverting}
@@ -286,7 +341,45 @@ const Index = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Middle Banner Ad */}
+        {!isAdFree && images.length > 0 && (
+          <AdSenseAd 
+            adSlot="0987654321"
+            className="w-full"
+            style={{ minHeight: '250px' }}
+          />
+        )}
       </div>
+
+      {/* Bottom Banner Ad - Fixed */}
+      {!isAdFree && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t">
+          <AdSenseAd 
+            adSlot="1122334455"
+            className="w-full"
+            style={{ minHeight: '60px' }}
+          />
+        </div>
+      )}
+
+      {/* Modals */}
+      <RemoveAdsModal 
+        isOpen={showRemoveAdsModal}
+        onClose={() => setShowRemoveAdsModal(false)}
+      />
+      
+      <InterstitialAd
+        isOpen={showInterstitialAd}
+        onClose={() => setShowInterstitialAd(false)}
+        onRemoveAds={() => {
+          setShowInterstitialAd(false);
+          setShowRemoveAdsModal(true);
+        }}
+      />
+
+      {/* Add bottom padding when bottom ad is visible */}
+      {!isAdFree && <div className="h-16" />}
     </div>
   );
 };
