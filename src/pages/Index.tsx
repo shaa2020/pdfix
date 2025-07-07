@@ -1,11 +1,11 @@
-
 import { useState, useRef } from "react";
-import { Camera, Upload, Download, Trash2, RotateCcw, Settings, Moon, Sun, Star, Info } from "lucide-react";
+import { Camera, Upload, Download, Trash2, RotateCcw, Settings, Moon, Sun, Star, Info, FileText, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
 import jsPDF from 'jspdf';
 import AdSenseAd from "@/components/ads/AdSenseAd";
@@ -23,15 +23,27 @@ interface ImageFile {
 }
 
 const Index = () => {
-  const [images, setImages] = useState<ImageFile[]>([]);
+  // PDF Converter States
+  const [pdfImages, setPdfImages] = useState<ImageFile[]>([]);
   const [pdfName, setPdfName] = useState("converted-images");
   const [pageSize, setPageSize] = useState("a4");
   const [imageScaling, setImageScaling] = useState("fit");
-  const [isConverting, setIsConverting] = useState(false);
+  const [isPdfConverting, setIsPdfConverting] = useState(false);
+  
+  // SVG Converter States
+  const [svgImages, setSvgImages] = useState<ImageFile[]>([]);
+  const [svgName, setSvgName] = useState("converted-image");
+  const [svgSize, setSvgSize] = useState("original");
+  const [isSvgConverting, setIsSvgConverting] = useState(false);
+  
+  // Common States
   const [showRemoveAdsModal, setShowRemoveAdsModal] = useState(false);
   const [showInterstitialAd, setShowInterstitialAd] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [conversionType, setConversionType] = useState<'pdf' | 'svg'>('pdf');
+  const pdfFileInputRef = useRef<HTMLInputElement>(null);
+  const pdfCameraInputRef = useRef<HTMLInputElement>(null);
+  const svgFileInputRef = useRef<HTMLInputElement>(null);
+  const svgCameraInputRef = useRef<HTMLInputElement>(null);
   
   const { isAdFree, loading } = useAdFree();
   const { theme, setTheme } = useTheme();
@@ -40,29 +52,30 @@ const Index = () => {
     isAdFree 
   });
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // PDF Converter Functions
+  const handlePdfFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    addImages(files);
+    addPdfImages(files);
   };
 
-  const handleCameraCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfCameraCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    addImages(files);
+    addPdfImages(files);
   };
 
-  const addImages = (files: File[]) => {
+  const addPdfImages = (files: File[]) => {
     const newImages: ImageFile[] = files.map(file => ({
       id: Date.now() + Math.random().toString(),
       file,
       url: URL.createObjectURL(file),
       name: file.name
     }));
-    setImages(prev => [...prev, ...newImages]);
-    toast.success(`Added ${files.length} image(s)`);
+    setPdfImages(prev => [...prev, ...newImages]);
+    toast.success(`Added ${files.length} image(s) for PDF conversion`);
   };
 
-  const removeImage = (id: string) => {
-    setImages(prev => {
+  const removePdfImage = (id: string) => {
+    setPdfImages(prev => {
       const imageToRemove = prev.find(img => img.id === id);
       if (imageToRemove) {
         URL.revokeObjectURL(imageToRemove.url);
@@ -71,21 +84,174 @@ const Index = () => {
     });
   };
 
-  const reorderImages = (fromIndex: number, toIndex: number) => {
-    const newImages = [...images];
-    const [movedImage] = newImages.splice(fromIndex, 1);
-    newImages.splice(toIndex, 0, movedImage);
-    setImages(newImages);
+  const clearAllPdf = () => {
+    pdfImages.forEach(img => URL.revokeObjectURL(img.url));
+    setPdfImages([]);
+    toast.success("All PDF images cleared");
   };
 
-  const convertToPDF = async () => {
-    if (images.length === 0) {
-      toast.error("Please select at least one image");
+  // SVG Converter Functions
+  const handleSvgFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    addSvgImages(files);
+  };
+
+  const handleSvgCameraCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    addSvgImages(files);
+  };
+
+  const addSvgImages = (files: File[]) => {
+    const newImages: ImageFile[] = files.map(file => ({
+      id: Date.now() + Math.random().toString(),
+      file,
+      url: URL.createObjectURL(file),
+      name: file.name
+    }));
+    setSvgImages(prev => [...prev, ...newImages]);
+    toast.success(`Added ${files.length} image(s) for SVG conversion`);
+  };
+
+  const removeSvgImage = (id: string) => {
+    setSvgImages(prev => {
+      const imageToRemove = prev.find(img => img.id === id);
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.url);
+      }
+      return prev.filter(img => img.id !== id);
+    });
+  };
+
+  const clearAllSvg = () => {
+    svgImages.forEach(img => URL.revokeObjectURL(img.url));
+    setSvgImages([]);
+    toast.success("All SVG images cleared");
+  };
+
+  const convertToSVG = async () => {
+    if (svgImages.length === 0) {
+      toast.error("Please select at least one image for SVG conversion");
       return;
     }
 
     // Show interstitial ad before conversion (if not ad-free)
     if (!isAdFree) {
+      setConversionType('svg');
+      setShowInterstitialAd(true);
+      return;
+    }
+
+    await performSVGConversion();
+  };
+
+  const performSVGConversion = async () => {
+    setIsSvgConverting(true);
+    try {
+      for (let i = 0; i < svgImages.length; i++) {
+        const image = svgImages[i];
+        
+        const img = new Image();
+        img.src = image.url;
+        
+        await new Promise((resolve, reject) => {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              reject(new Error('Canvas context not available'));
+              return;
+            }
+
+            // Get original image dimensions for maximum quality
+            const originalWidth = img.naturalWidth || img.width;
+            const originalHeight = img.naturalHeight || img.height;
+            
+            let canvasWidth, canvasHeight;
+            
+            if (svgSize === 'original') {
+              canvasWidth = originalWidth;
+              canvasHeight = originalHeight;
+            } else if (svgSize === 'hd') {
+              // HD: 1920x1080 aspect ratio maintained
+              const aspectRatio = originalWidth / originalHeight;
+              if (aspectRatio > 16/9) {
+                canvasWidth = 1920;
+                canvasHeight = 1920 / aspectRatio;
+              } else {
+                canvasHeight = 1080;
+                canvasWidth = 1080 * aspectRatio;
+              }
+            } else { // 4k
+              // 4K: 3840x2160 aspect ratio maintained
+              const aspectRatio = originalWidth / originalHeight;
+              if (aspectRatio > 16/9) {
+                canvasWidth = 3840;
+                canvasHeight = 3840 / aspectRatio;
+              } else {
+                canvasHeight = 2160;
+                canvasWidth = 2160 * aspectRatio;
+              }
+            }
+            
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            
+            // Enable high-quality rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Draw image at high resolution
+            ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+            
+            // Convert to high-quality data URL
+            const dataURL = canvas.toDataURL('image/png', 1.0);
+            
+            // Create SVG with embedded image at maximum quality
+            const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${canvasWidth}" height="${canvasHeight}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <image width="${canvasWidth}" height="${canvasHeight}" xlink:href="${dataURL}" />
+</svg>`;
+            
+            // Download SVG
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${svgName}${svgImages.length > 1 ? `-${i + 1}` : ''}.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            resolve(void 0);
+          };
+          
+          img.onerror = () => {
+            reject(new Error(`Failed to load image: ${image.name}`));
+          };
+        });
+      }
+
+      toast.success(`${svgImages.length} SVG file(s) generated successfully!`);
+    } catch (error) {
+      console.error("Error generating SVG:", error);
+      toast.error("Failed to generate SVG");
+    } finally {
+      setIsSvgConverting(false);
+      setShowInterstitialAd(false);
+    }
+  };
+
+  const convertToPDF = async () => {
+    if (pdfImages.length === 0) {
+      toast.error("Please select at least one image for PDF conversion");
+      return;
+    }
+
+    // Show interstitial ad before conversion (if not ad-free)
+    if (!isAdFree) {
+      setConversionType('pdf');
       setShowInterstitialAd(true);
       return;
     }
@@ -94,13 +260,16 @@ const Index = () => {
   };
 
   const handleAdComplete = async () => {
-    // This function is called after the interstitial ad is completed
     setShowInterstitialAd(false);
-    await performPDFConversion();
+    if (conversionType === 'pdf') {
+      await performPDFConversion();
+    } else {
+      await performSVGConversion();
+    }
   };
 
   const performPDFConversion = async () => {
-    setIsConverting(true);
+    setIsPdfConverting(true);
     try {
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -111,13 +280,13 @@ const Index = () => {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
 
-      for (let i = 0; i < images.length; i++) {
+      for (let i = 0; i < pdfImages.length; i++) {
         if (i > 0) {
           pdf.addPage();
         }
 
         const img = new Image();
-        img.src = images[i].url;
+        img.src = pdfImages[i].url;
         
         await new Promise((resolve) => {
           img.onload = () => {
@@ -195,7 +364,7 @@ const Index = () => {
           };
           
           img.onerror = () => {
-            console.error('Failed to load image:', images[i].name);
+            console.error('Failed to load image:', pdfImages[i].name);
             resolve(void 0);
           };
         });
@@ -207,15 +376,9 @@ const Index = () => {
       console.error("Error generating PDF:", error);
       toast.error("Failed to generate PDF");
     } finally {
-      setIsConverting(false);
+      setIsPdfConverting(false);
       setShowInterstitialAd(false);
     }
-  };
-
-  const clearAll = () => {
-    images.forEach(img => URL.revokeObjectURL(img.url));
-    setImages([]);
-    toast.success("All images cleared");
   };
 
   if (loading) {
@@ -229,7 +392,7 @@ const Index = () => {
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold">PDF Converter</h1>
+          <h1 className="text-xl font-bold">Image Converter</h1>
           <div className="flex items-center gap-2">
             {!isAdFree && (
               <Button
@@ -270,148 +433,288 @@ const Index = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">
-              Image to PDF Converter
+              Image Converter
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="h-12 text-base"
-                variant="outline"
-              >
-                <Upload className="mr-2 h-5 w-5" />
-                Select Images
-              </Button>
-              <Button
-                onClick={() => cameraInputRef.current?.click()}
-                className="h-12 text-base"
-                variant="outline"
-              >
-                <Camera className="mr-2 h-5 w-5" />
-                Take Photo
-              </Button>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleCameraCapture}
-              className="hidden"
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="pdfName">PDF Name</Label>
-                <Input
-                  id="pdfName"
-                  value={pdfName}
-                  onChange={(e) => setPdfName(e.target.value)}
-                  placeholder="Enter PDF name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="pageSize">Page Size</Label>
-                <Select value={pageSize} onValueChange={setPageSize}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="a4">A4</SelectItem>
-                    <SelectItem value="letter">Letter</SelectItem>
-                    <SelectItem value="legal">Legal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="scaling">Image Scaling</Label>
-                <Select value={imageScaling} onValueChange={setImageScaling}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fit">Fit to Page</SelectItem>
-                    <SelectItem value="fill">Fill Page</SelectItem>
-                    <SelectItem value="original">Original Size</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {images.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">
-                    Selected Images ({images.length})
-                  </h3>
-                  <Button onClick={clearAll} variant="destructive" size="sm">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear All
+          <CardContent>
+            <Tabs defaultValue="pdf" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="pdf" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Image to PDF
+                </TabsTrigger>
+                <TabsTrigger value="svg" className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" />
+                  Image to SVG
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* PDF Converter Tab */}
+              <TabsContent value="pdf" className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Button
+                    onClick={() => pdfFileInputRef.current?.click()}
+                    className="h-12 text-base"
+                    variant="outline"
+                  >
+                    <Upload className="mr-2 h-5 w-5" />
+                    Select Images
+                  </Button>
+                  <Button
+                    onClick={() => pdfCameraInputRef.current?.click()}
+                    className="h-12 text-base"
+                    variant="outline"
+                  >
+                    <Camera className="mr-2 h-5 w-5" />
+                    Take Photo
                   </Button>
                 </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {images.map((image, index) => (
-                    <div
-                      key={image.id}
-                      className="relative group border rounded-lg overflow-hidden bg-muted"
-                    >
-                      <img
-                        src={image.url}
-                        alt={image.name}
-                        className="w-full h-32 object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => removeImage(image.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
-                        {index + 1}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            <Button
-              onClick={convertToPDF}
-              disabled={images.length === 0 || isConverting}
-              className="w-full h-12 text-base"
-              size="lg"
-            >
-              {isConverting ? (
-                <>
-                  <RotateCcw className="mr-2 h-5 w-5 animate-spin" />
-                  Converting...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-5 w-5" />
-                  Convert to PDF
-                </>
-              )}
-            </Button>
+                <input
+                  ref={pdfFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePdfFileSelect}
+                  className="hidden"
+                />
+                <input
+                  ref={pdfCameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handlePdfCameraCapture}
+                  className="hidden"
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="pdfName">PDF Name</Label>
+                    <Input
+                      id="pdfName"
+                      value={pdfName}
+                      onChange={(e) => setPdfName(e.target.value)}
+                      placeholder="Enter PDF name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="pageSize">Page Size</Label>
+                    <Select value={pageSize} onValueChange={setPageSize}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="a4">A4</SelectItem>
+                        <SelectItem value="letter">Letter</SelectItem>
+                        <SelectItem value="legal">Legal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="scaling">Image Scaling</Label>
+                    <Select value={imageScaling} onValueChange={setImageScaling}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fit">Fit to Page</SelectItem>
+                        <SelectItem value="fill">Fill Page</SelectItem>
+                        <SelectItem value="original">Original Size</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {pdfImages.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">
+                        Selected Images ({pdfImages.length})
+                      </h3>
+                      <Button onClick={clearAllPdf} variant="destructive" size="sm">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Clear All
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {pdfImages.map((image, index) => (
+                        <div
+                          key={image.id}
+                          className="relative group border rounded-lg overflow-hidden bg-muted"
+                        >
+                          <img
+                            src={image.url}
+                            alt={image.name}
+                            className="w-full h-32 object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => removePdfImage(image.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
+                            {index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  onClick={convertToPDF}
+                  disabled={pdfImages.length === 0 || isPdfConverting}
+                  className="w-full h-12 text-base"
+                  size="lg"
+                >
+                  {isPdfConverting ? (
+                    <>
+                      <RotateCcw className="mr-2 h-5 w-5 animate-spin" />
+                      Converting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-5 w-5" />
+                      Convert to PDF
+                    </>
+                  )}
+                </Button>
+              </TabsContent>
+
+              {/* SVG Converter Tab */}
+              <TabsContent value="svg" className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Button
+                    onClick={() => svgFileInputRef.current?.click()}
+                    className="h-12 text-base"
+                    variant="outline"
+                  >
+                    <Upload className="mr-2 h-5 w-5" />
+                    Select Images
+                  </Button>
+                  <Button
+                    onClick={() => svgCameraInputRef.current?.click()}
+                    className="h-12 text-base"
+                    variant="outline"
+                  >
+                    <Camera className="mr-2 h-5 w-5" />
+                    Take Photo
+                  </Button>
+                </div>
+
+                <input
+                  ref={svgFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleSvgFileSelect}
+                  className="hidden"
+                />
+                <input
+                  ref={svgCameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleSvgCameraCapture}
+                  className="hidden"
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="svgName">SVG Name</Label>
+                    <Input
+                      id="svgName"
+                      value={svgName}
+                      onChange={(e) => setSvgName(e.target.value)}
+                      placeholder="Enter SVG name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="svgSize">Output Quality</Label>
+                    <Select value={svgSize} onValueChange={setSvgSize}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="original">Original Size</SelectItem>
+                        <SelectItem value="hd">HD Quality</SelectItem>
+                        <SelectItem value="4k">4K Quality</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {svgImages.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold">
+                        Selected Images ({svgImages.length})
+                      </h3>
+                      <Button onClick={clearAllSvg} variant="destructive" size="sm">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Clear All
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {svgImages.map((image, index) => (
+                        <div
+                          key={image.id}
+                          className="relative group border rounded-lg overflow-hidden bg-muted"
+                        >
+                          <img
+                            src={image.url}
+                            alt={image.name}
+                            className="w-full h-32 object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => removeSvgImage(image.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
+                            {index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  onClick={convertToSVG}
+                  disabled={svgImages.length === 0 || isSvgConverting}
+                  className="w-full h-12 text-base"
+                  size="lg"
+                >
+                  {isSvgConverting ? (
+                    <>
+                      <RotateCcw className="mr-2 h-5 w-5 animate-spin" />
+                      Converting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-5 w-5" />
+                      Convert to SVG
+                    </>
+                  )}
+                </Button>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
         {/* Middle Banner Ad */}
-        {!isAdFree && images.length > 0 && (
+        {!isAdFree && (pdfImages.length > 0 || svgImages.length > 0) && (
           <AdSenseAd 
             key={`middle-${adKey}`}
             adSlot="0987654321"
