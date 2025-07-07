@@ -95,8 +95,11 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center">
-            Remove Ads - {prices[selectedCurrency as keyof typeof prices].amount}
+            Remove Ads - 1 Month Subscription
           </DialogTitle>
+          <p className="text-sm text-muted-foreground text-center mt-2">
+            {prices[selectedCurrency as keyof typeof prices].amount} for 1 month ad-free experience
+          </p>
         </DialogHeader>
         
         <div className="space-y-4">
@@ -136,6 +139,9 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
                       <p className="text-sm text-muted-foreground">{method.number}</p>
                       <p className="text-sm font-medium text-primary">
                         Send: {prices[selectedCurrency as keyof typeof prices].amount}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        1 month subscription
                       </p>
                     </div>
                   </div>
@@ -180,6 +186,10 @@ const RemoveAdsModal: React.FC<RemoveAdsModalProps> = ({ isOpen, onClose }) => {
               <Button onClick={handleSubmitPayment} className="w-full">
                 Submit for Verification
               </Button>
+              
+              <p className="text-xs text-muted-foreground text-center">
+                Your 1-month ad-free subscription will be activated after payment verification
+              </p>
             </div>
           )}
         </div>
