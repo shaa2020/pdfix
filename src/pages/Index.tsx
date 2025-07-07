@@ -92,6 +92,12 @@ const Index = () => {
     await performPDFConversion();
   };
 
+  const handleAdComplete = async () => {
+    // This function is called after the interstitial ad is completed
+    setShowInterstitialAd(false);
+    await performPDFConversion();
+  };
+
   const performPDFConversion = async () => {
     setIsConverting(true);
     try {
@@ -393,6 +399,7 @@ const Index = () => {
           setShowInterstitialAd(false);
           setShowRemoveAdsModal(true);
         }}
+        onAdComplete={handleAdComplete}
       />
 
       {/* Add bottom padding when bottom ad is visible */}

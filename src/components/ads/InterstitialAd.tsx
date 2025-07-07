@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, TimerReset } from "lucide-react";
 
@@ -8,9 +8,15 @@ interface InterstitialAdProps {
   isOpen: boolean;
   onClose: () => void;
   onRemoveAds: () => void;
+  onAdComplete?: () => void;
 }
 
-const InterstitialAd: React.FC<InterstitialAdProps> = ({ isOpen, onClose, onRemoveAds }) => {
+const InterstitialAd: React.FC<InterstitialAdProps> = ({ 
+  isOpen, 
+  onClose, 
+  onRemoveAds, 
+  onAdComplete 
+}) => {
   const [timeLeft, setTimeLeft] = useState(5);
   const [canClose, setCanClose] = useState(false);
 
@@ -37,12 +43,21 @@ const InterstitialAd: React.FC<InterstitialAdProps> = ({ isOpen, onClose, onRemo
   const handleClose = () => {
     if (canClose) {
       onClose();
+      // Call the completion callback after ad is viewed
+      if (onAdComplete) {
+        onAdComplete();
+      }
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={canClose ? onClose : undefined}>
+    <Dialog open={isOpen} onOpenChange={canClose ? handleClose : undefined}>
       <DialogContent className="max-w-sm p-0 gap-0">
+        <DialogTitle className="sr-only">Advertisement</DialogTitle>
+        <DialogDescription className="sr-only">
+          Please wait for the advertisement to finish before continuing
+        </DialogDescription>
+        
         <div className="relative">
           <Button
             variant="ghost"
