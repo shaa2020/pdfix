@@ -392,7 +392,14 @@ const Index = () => {
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-bold">Image Converter</h1>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/lovable-uploads/b53127f8-1b83-4633-8b49-4078eecec969.png" 
+              alt="PDFix Logo" 
+              className="h-8 w-auto"
+            />
+            <h1 className="text-xl font-bold">PDFix</h1>
+          </div>
           <div className="flex items-center gap-2">
             {!isAdFree && (
               <Button
@@ -433,7 +440,7 @@ const Index = () => {
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-bold text-center">
-              Image Converter
+              PDFix - Professional Image Converter
             </CardTitle>
           </CardHeader>
           <CardContent>
