@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Camera, Upload, Download, Trash2, RotateCcw, Settings, Moon, Sun, Star, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -120,29 +121,81 @@ const Index = () => {
         
         await new Promise((resolve) => {
           img.onload = () => {
+            // Create high-resolution canvas
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            let { width, height } = img;
+            if (!ctx) {
+              resolve(void 0);
+              return;
+            }
+
+            // Get original image dimensions
+            const originalWidth = img.naturalWidth || img.width;
+            const originalHeight = img.naturalHeight || img.height;
+            
+            let canvasWidth, canvasHeight, drawWidth, drawHeight, offsetX = 0, offsetY = 0;
             
             if (imageScaling === 'fit') {
-              const ratio = Math.min(pageWidth / width, pageHeight / height);
-              width *= ratio;
-              height *= ratio;
+              // Calculate aspect ratio preserving dimensions
+              const aspectRatio = originalWidth / originalHeight;
+              const pageAspectRatio = pageWidth / pageHeight;
+              
+              if (aspectRatio > pageAspectRatio) {
+                // Image is wider than page ratio
+                drawWidth = pageWidth;
+                drawHeight = pageWidth / aspectRatio;
+                offsetY = (pageHeight - drawHeight) / 2;
+              } else {
+                // Image is taller than page ratio
+                drawHeight = pageHeight;
+                drawWidth = pageHeight * aspectRatio;
+                offsetX = (pageWidth - drawWidth) / 2;
+              }
+              
+              // Use high resolution for canvas
+              const scaleFactor = Math.max(1, Math.min(originalWidth / drawWidth, originalHeight / drawHeight));
+              canvasWidth = drawWidth * scaleFactor;
+              canvasHeight = drawHeight * scaleFactor;
+              
             } else if (imageScaling === 'fill') {
-              width = pageWidth;
-              height = pageHeight;
+              drawWidth = pageWidth;
+              drawHeight = pageHeight;
+              // Use page dimensions but maintain high resolution
+              const scaleFactor = Math.max(originalWidth / pageWidth, originalHeight / pageHeight);
+              canvasWidth = pageWidth * scaleFactor;
+              canvasHeight = pageHeight * scaleFactor;
+              
+            } else { // original
+              drawWidth = Math.min(originalWidth * 0.264583, pageWidth); // Convert px to mm (96 DPI)
+              drawHeight = Math.min(originalHeight * 0.264583, pageHeight);
+              offsetX = (pageWidth - drawWidth) / 2;
+              offsetY = (pageHeight - drawHeight) / 2;
+              canvasWidth = originalWidth;
+              canvasHeight = originalHeight;
             }
             
-            canvas.width = width;
-            canvas.height = height;
-            ctx?.drawImage(img, 0, 0, width, height);
+            // Set canvas dimensions to maintain high quality
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
             
-            const imgData = canvas.toDataURL('image/jpeg', 0.8);
-            const x = (pageWidth - width) / 2;
-            const y = (pageHeight - height) / 2;
+            // Enable high-quality rendering
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             
-            pdf.addImage(imgData, 'JPEG', x, y, width, height);
+            // Draw image at high resolution
+            ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+            
+            // Convert to high-quality JPEG
+            const imgData = canvas.toDataURL('image/jpeg', 1.0); // Maximum quality
+            
+            // Add to PDF
+            pdf.addImage(imgData, 'JPEG', offsetX, offsetY, drawWidth, drawHeight);
+            resolve(void 0);
+          };
+          
+          img.onerror = () => {
+            console.error('Failed to load image:', images[i].name);
             resolve(void 0);
           };
         });
